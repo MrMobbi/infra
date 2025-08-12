@@ -1,0 +1,92 @@
+
+# Install Packages #
+sudo apt update
+sudo apt install -y dnsmasq syslinux-common pxelinux tftpd-hpa apache2
+
+This installs:
+
+    dnsmasq – Lightweight DHCP + TFTP
+	{
+		DHCP: Dynamic Host Configuration Protocol
+		➤ What it does:
+			Assigns IP addresses automatically to clients on the network.
+			Provides boot information for PXE clients, such as:
+				The TFTP server IP
+				The boot file name (like pxelinux.0 or bootx64.efi)
+
+		TFTP: Trivial File Transfer Protocol
+		➤ What it does:
+			A very simple file transfer protocol (unlike FTP or HTTP).
+			Used to transfer boot files (like kernels, initrd, PXE bootloader) from the server to the client.
+			Operates over UDP (port 69).
+		➤ Why it matters in PXE:
+		After the client gets the boot file name from DHCP, it contacts the TFTP server to download that file and begin booting.
+
+
+		| Component | Meaning                             | Purpose in PXE                                  |
+		| --------- | ----------------------------------- | ----------------------------------------------- |
+		| DHCP      | Dynamic Host Configuration Protocol | Assigns IP, provides boot file name & TFTP info |
+		| TFTP      | Trivial File Transfer Protocol      | Transfers boot files to client                  |
+		| dnsmasq   | Lightweight server                  | Combines DHCP + TFTP (and DNS if needed)        |
+	}
+
+    syslinux-common & pxelinux – BIOS PXE bootloaders
+	{
+		syslinux-common
+		What it is:
+			syslinux-common is part of the SYSLINUX project — a suite of lightweight bootloaders for starting Linux systems.
+			This package provides shared files used by different bootloaders in the SYSLINUX family.
+
+		it contains Common files like:
+			- ldlinux.c32
+			- libcom32.c32
+			- menu.c32
+			- vesamenu.c32
+
+		These are support files that help with:
+			- Menus
+			- Graphics
+			- Advanced boot options
+
+		Think of syslinux-common as the "toolkit" or "library" used by specific bootloaders like pxelinux.
+
+		pxelinux
+		What it is:
+			pxelinux is a bootloader for PXE clients, part of the SYSLINUX family.
+
+		Its job:
+			It is the actual bootloader binary that a PXE client downloads and runs after contacting the TFTP server.
+			It reads the PXE configuration file, usually found in:
+				/tftpboot/pxelinux.cfg/default
+				Or:
+				/var/lib/tftpboot/pxelinux.cfg/default
+
+		What it includes:
+			pxelinux.0: the actual PXE bootloader (this is what you set in the DHCP config)
+			Works with .c32 files from syslinux-common to show boot menus, load kernel/initrd, etc.
+
+		How They Work Together in PXE Boot:
+			1)PXE client gets IP from DHCP (dnsmasq) and is told to download pxelinux.0 from TFTP.
+			2)TFTP server (also dnsmasq) serves pxelinux.0 from a directory like /tftpboot/.
+			3)pxelinux.0 is the bootloader binary (from pxelinux package).
+			4)It then loads:
+				- Config file (pxelinux.cfg/default)
+				- Menu files (menu.c32, vesamenu.c32, etc. from syslinux-common)
+				- Kernel and initrd
+			5)Boot begins!
+
+			| Package           | What It Does                                  | Key File(s)                     |
+			| ----------------- | --------------------------------------------- | ------------------------------- |
+			| `syslinux-common` | Provides shared support files for bootloaders | `menu.c32`, `ldlinux.c32`, etc. |
+			| `pxelinux`        | PXE-specific bootloader                       | `pxelinux.0`                    |
+	}
+
+    tftpd-hpa – Optional (but we’ll use dnsmasq's built-in TFTP)
+
+    apache2 – HTTP server (for scalable file delivery later)
+
+
+We'll use /srv/tftp as our root (standard in Ubuntu for custom services):
+sudo mkdir -p /srv/tftp/pxelinux.cfg
+sudo mkdir -p /srv/tftp/EFI/BOOT
+sudo mkdir -p /srv/http
